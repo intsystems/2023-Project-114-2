@@ -1,0 +1,73 @@
+\documentclass{beamer}
+\beamertemplatenavigationsymbolsempty
+\usecolortheme{beaver}
+\setbeamertemplate{blocks}[rounded=true, shadow=true]
+\setbeamertemplate{footline}[page number]
+%
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{amssymb,amsfonts,amsmath,mathtext}
+\usepackage{subfig}
+\usepackage[all]{xy} % xy package for diagrams
+\usepackage{array}
+\usepackage{multicol}% many columns in slide
+\usepackage{hyperref}% urls
+\usepackage{hhline}%tables
+% Your figures are here:
+\graphicspath{ {fig/} {../fig/} }
+
+%----------------------------------------------------------------------------------------------------------
+\title[\hbox to 56mm{Порождение признаков}]{Моделирование динамики физических систем с помощью Physics-Informed Neural Networks}
+\author{Терентьев Алексанр Андреевич}
+\institute{Московский физико-технический институт}
+\date{\footnotesize
+\par\bigskip\small 2023}
+%----------------------------------------------------------------------------------------------------------
+\begin{document}
+%----------------------------------------------------------------------------------------------------------
+\begin{frame}
+\thispagestyle{empty}
+\maketitle
+\end{frame}
+%-----------------------------------------------------------------------------------------------------
+%-----------------------------------------------------------------------------------------------------
+\begin{frame}{Моделирование физисеской системы с помощью PINN}
+
+
+$$ \frac{\partial L}{\partial x} \ -\ \frac{d}{dt} \ \frac{\partial L}{\partial \dot{x}} =Q_{x} $$
+$$ \ddot{q} =\left(\frac{\partial ^{2} L}{\partial x^{2}}\right)^{-1} \cdot \left[\frac{\partial L}{\partial q} \ -\ \left(\frac{\partial ^{2} L}{\partial \dot{q} \partial q}\right)\dot{q} \ +Q\right] $$
+
+\begin{columns}[c]
+\column{0.5\textwidth}
+\includegraphics[width=1.0\textwidth]{trajectory.png}
+\column{0.5\textwidth}
+\includegraphics[width=1.0\textwidth]{Scheme.png}
+\end{columns}
+
+\bigskip
+Функция потерь
+
+$$\mathcal{L}(\mathbf{y}, \mathbf{X}, \mathbf{w}) =\left\lVert \hat{\mathbf{y}} - \mathbf{y} \right\rVert^{2}_2.$$
+\end{frame}
+
+%----------------------------------------------------------------------------------------------------------
+\end{document} 
+\end{frame}
+%-----------------------------------------------------------------------------------------------------
+
+
+\end{frame}
+%----------------------------------------------------------------------------------------------------------
+\begin{frame}{���������� ������}
+\end{frame}
+%----------------------------------------------------------------------------------------------------------
+\begin{frame}{�������}
+\end{frame}
+%----------------------------------------------------------------------------------------------------------
+\begin{frame}{�������������� �����������}
+\end{frame}
+%----------------------------------------------------------------------------------------------------------
+\begin{frame}{����������}
+\end{frame}
+%----------------------------------------------------------------------------------------------------------
+\end{document} 
