@@ -87,9 +87,7 @@ def set_trajectory_target(subjectID, activityID, selected_sensors, dataCol):
         for activity_id in activityID:
             df = dataCol.loc[(dataCol.subject_id == user_id) & (dataCol.activityID == activity_id)]
             velocities = df[selected_sensors].to_numpy()
-            
             l = len(velocities) // 500
-            
             if l > 0:
                 for sub_trajectory in np.array_split(velocities, l, axis = 0):
                     all_velocities.append(sub_trajectory)
@@ -115,12 +113,11 @@ def vel_cut(vel_components):
 
 
 def form_trajectory(vel_components, name):
-    
-    x_train = np.hstack((vel2coord(vel_components), vel_cut(vel_components)))
-    y_train = np.hstack((vel_cut(vel_components), vel2acc(vel_components)))
-    
+    train = vel2coord(vel_components)
+    X_train = np.hstack((vel2coord(vel_components), vel_cut(vel_components)))
+    y_train = vel2acc(vel_components)
     with open(Path("code/trajectories", name), 'wb') as handle:
-        pickle.dump([x_train, y_train], handle, protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump([X_train, y_train], handle, protocol=pickle.HIGHEST_PROTOCOL)
     
 def form_all_trajectories(multiple_vel_arrs, experiment_name):
     
