@@ -8,13 +8,30 @@ from tqdm import tqdm
 from sklearn.decomposition import PCA
 from pathlib import Path
 import pickle
+import torch
 import numpy as np
 
-def get_data(first, end, targets):
+from sklearn.utils._testing import ignore_warnings
+from sklearn.exceptions import ConvergenceWarning
+
+def get_data(first, end, targets, experiment_name):
     id_list = range(first, end)
     x_arr = []
     for i in id_list:
-        with open(Path("code/logs", f"lnn_model_experiment2_{i + 1}.pickle"), 'rb') as f:
+        with open(Path("code/logs", f"lnn_model_{experiment_name}_{i + 1}.pickle"), 'rb') as f:
+            x_arr.append(np.array(pickle.load(f)))
+                
+    X = np.array(x_arr)
+    y = np.array(targets[first: end])
+    return X, y
+
+
+
+def get_data(first, end, targets, experiment_name):
+    id_list = range(first, end)
+    x_arr = []
+    for i in id_list:
+        with open(Path("code/logs", f"lnn_model_{experiment_name}_{i + 1}.pickle"), 'rb') as f:
             x_arr.append(np.array(pickle.load(f)))
                 
     X = np.array(x_arr)
@@ -27,6 +44,7 @@ def transform_data(X_train, X_test, componentsNumber = 17):
     X_test_transformed = pca_instance.transform(X_test)
     return  X_train_transformed,  X_test_transformed
 
+@ignore_warnings(category=ConvergenceWarning)
 def compareClassifiresperPCA(starPCA, endPCA, X_train, X_test, y_train, y_test , random_state):
     x = []
     y_1 = []
@@ -43,10 +61,10 @@ def compareClassifiresperPCA(starPCA, endPCA, X_train, X_test, y_train, y_test ,
         regression = LogisticRegression(C=1.0)
         regression.fit(X_train_transformed, y_train)
         
-        gpc = GaussianProcessClassifier(kernel= RBF(0.34), random_state=random_state)
+        gpc = GaussianProcessClassifier(kernel= RBF(1), random_state=random_state)
         gpc.fit(X_train_transformed, y_train)
         
-        forest = RandomForestClassifier(n_estimators=1000)
+        forest = RandomForestClassifier(n_estimators=100)
         forest.fit(X_train_transformed, y_train)
 
         knn = KNeighborsClassifier()

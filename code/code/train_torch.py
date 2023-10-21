@@ -106,10 +106,10 @@ def get_func_coords(model):
     return model
 
 def get_transformation_matrix_to_q(deg_of_freedom = DEGREES_OF_FREEDOM, device = torch.device("cpu")):
-    Aq = torch.eye(deg_of_freedom, 2 * deg_of_freedom, device=device)
+    Aq = torch.eye(deg_of_freedom, 2 * deg_of_freedom, device=device, dtype = torch.float32)
     return Aq
 def get_transformation_matrix_to_qt(deg_of_freedom, device = torch.device("cpu")):
-    Aq_t = torch.diag(torch.ones(deg_of_freedom, device = device), diagonal=deg_of_freedom)[:-deg_of_freedom]
+    Aq_t = torch.diag(torch.ones(deg_of_freedom, device = device, dtype = torch.float32), diagonal=deg_of_freedom)[:-deg_of_freedom]
     return Aq_t
 
 def get_acc(model, x, deg_of_freedom = DEGREES_OF_FREEDOM, device = torch.device("cpu")):
@@ -120,14 +120,17 @@ def get_acc(model, x, deg_of_freedom = DEGREES_OF_FREEDOM, device = torch.device
     #print(model(x))
     grad = jacobian(model , x, create_graph=True, vectorize = True) #полный градиент
     #print(grad)
-    grad_q = torch.einsum('ij, ...j->...i', Aq, grad)
+    #grad_q = torch.einsum('ij, ...j->...i', Aq, grad)
+    grad_q = (Aq @ x.T).T
     #print(grad_q)
     H = vmap(torch.func.jacrev(torch.func.jacrev(model)), in_dims= 0)(x)
     #print(H)
     #print(Aq.shape)
-    H_qqt = torch.einsum('im, ...mk, kj ->...ij', Aq, H, Aqt.T)
-    qtt_pred = grad_q - torch.einsum('...im, mk, ...k ->...i', H_qqt, Aqt, x)
-    #qtt_pred = grad_q - H_qqt @ Aqt @ x
+    #H_qqt = torch.einsum('im, ...mk, kj ->...ij', Aq, H, Aqt.T)
+
+    H_qqt = torch.matmul(torch.matmul(Aq, H), Aqt.T)
+    #qtt_pred = grad_q - torch.einsum('...im, mk, ...k ->...i', H_qqt, Aqt, x)
+    qtt_pred = grad_q - torch.bmm(H_qqt,torch.matmul(Aqt, x.T).T.unsqueeze(-1)).squeeze(-1)
     return qtt_pred
 
 def get_hess(model, x, deg_of_freedom = DEGREES_OF_FREEDOM, device = torch.device("cpu")):
@@ -137,7 +140,8 @@ def get_hess(model, x, deg_of_freedom = DEGREES_OF_FREEDOM, device = torch.devic
     #H = torch.zeros([batch_size, 2 * deg_of_freedom,  2 * deg_of_freedom], dtype=torch.float32, device=device)
     #for t in range(batch_size):
         #H[t] = hessian(model, x[t], create_graph=True, vectorize = True)
-    H_qtqt = torch.einsum('im, ...mk, kj ->...ij', Aqt, H, Aqt.T)
+    #H_qtqt = torch.einsum('im, ...mk, kj ->...ij', Aqt, H, Aqt.T)
+    H_qtqt = torch.matmul(torch.matmul(Aqt, H), Aqt.T)
     return H_qtqt
 
 def get_fullhess(model, x, deg_of_freedom = DEGREES_OF_FREEDOM, device = torch.device("cpu")):
@@ -149,13 +153,14 @@ def get_fullhess(model, x, deg_of_freedom = DEGREES_OF_FREEDOM, device = torch.d
 def loss_fn(L, x, y, deg_of_freedom = DEGREES_OF_FREEDOM, device = torch.device("cpu")):
     gloss_fn = nn.MSELoss()
     pred_qtt = get_acc(L, x, deg_of_freedom, device)
-    H = get_hess(L, x, deg_of_freedom, device)
+    H_qtqt = get_hess(L, x, deg_of_freedom, device)
     #print(x)
     #print(y)
-    tranformed_y = torch.einsum('...im, ...m ->...i', H, y)
+    #tranformed_y = torch.einsum('...im, ...m ->...i', H, y)
+    tranformed_y = torch.bmm(H_qtqt,y.unsqueeze(-1)).squeeze(-1)
     #print(pred_qtt)
     #print(tranformed_y)
-    det = torch.det(H)
+    #det = torch.det(H_qtqt)
     alpha = 2
     beta = 5
     act = nn.SiLU()
@@ -165,7 +170,8 @@ def loss_fn(L, x, y, deg_of_freedom = DEGREES_OF_FREEDOM, device = torch.device(
     #print(torch.exp(alpha * act(beta*(1 - torch.linalg.eigvalsh(H)))))
     #print(torch.exp(alpha * act(beta*(1 - torch.linalg.eigvalsh(H)))) - np.exp(alpha * LAMBERTWFUNCMIN))
     #print(torch.einsum('...i->...',torch.exp(alpha * act(beta*(1 - torch.linalg.eigvalsh(H)))) - np.exp(alpha * LAMBERTWFUNCMIN)))
-    adj_vect = torch.einsum('...i->...',torch.exp(alpha * act(beta*(1 - torch.linalg.eigvalsh(H)))) - np.exp(alpha * LAMBERTWFUNCMIN))
+    adj_vect = torch.einsum('...i->...',torch.exp(alpha * act(beta*(1 - torch.linalg.eigvalsh(H_qtqt)))) - np.exp(alpha * LAMBERTWFUNCMIN))
+    #adj_vect = torch.sum(torch.exp(alpha * act(beta*(1 - torch.linalg.eigvalsh(H_qtqt)))) - np.exp(alpha * LAMBERTWFUNCMIN), dim = -1)
     adj = torch.mean(adj_vect)
     #print(adj)
     #print(torch.mean(torch.einsum('...i->...', torch.exp(alpha * act(beta*(1 - torch.linalg.eigvalsh(H)))) - np.exp(alpha * LAMBERTWFUNCMIN))))
@@ -178,6 +184,8 @@ def plot_loss(train_losses, test_losses, log_dir, name):
     """
     plot of loss
     """
+    k = 0.1
+    train_losses, test_losses = train_losses[int(k*len(test_losses)):], test_losses[int(k*len(test_losses)):]
     plt.figure(figsize=(8, 3.5), dpi=120)
     plt.plot(train_losses, label='Train loss')
     plt.plot(test_losses, label='Test loss')
@@ -242,12 +250,14 @@ def train_model(name, training_dataloader, test_dataloader, epochs = 10, deg_of_
             torch.save(model.state_dict(), handle)
         x, y_real = training_dataloader.dataset[:]
         y_real = y_real.to(device)
-        y_pred = get_acc(model, x, deg_of_freedom, device)
-        H = get_hess(model, x, deg_of_freedom, device)
+        
+        Hqtqt = get_hess(model, x, deg_of_freedom, device)
 
         #print(x)
         #print(y)
-        y_real = torch.einsum('...im, ...m ->...i', H, y_real)
+
+        #y_real = torch.einsum('...im, ...m ->...i', Hqtqt, y_real)
+        y_real = torch.bmm(Hqtqt,y_real.unsqueeze(-1)).squeeze(-1)
         y_real = y_real.to(torch.device("cpu")).detach()
         y_pred = y_pred.to(torch.device("cpu")).detach()
         plot_diff(y_real, y_pred, log, name)
@@ -258,15 +268,21 @@ def train_model(name, training_dataloader, test_dataloader, epochs = 10, deg_of_
 def get_sample_model(x, deg_of_freedom = DEGREES_OF_FREEDOM, device = torch.device("cpu")):
     Aq = get_transformation_matrix_to_q(deg_of_freedom, device)
     Aqt = get_transformation_matrix_to_qt(deg_of_freedom, device)
-    q = torch.einsum('...ik, ...k->...i', Aq, x)
-    qt = torch.einsum('...ik, ...k->...i', Aqt, x)
+    #q = torch.einsum('...ik, ...k->...i', Aq, x)
+    q = torch.bmm(Aq, x)
+    #qt = torch.einsum('...ik, ...k->...i', Aqt, x)
+    qt = torch.bmm(Aqt, x)
     #print(x)
     #print(q)
     #print(qt)
     return (qt*qt - q*q).sum()
 
 def main():
+    #device = torch.device("cpu")
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     experiment_name = str(sys.argv[1])
     deg_of_freedom = int(sys.argv[2])
     n = int(sys.argv[3])
@@ -274,7 +290,7 @@ def main():
     epochs = EPOCHS
     batch_size = BATCH_SIZE
     log_dir = LOG_DIR
-    for i in range(start_idx, start_idx + n):
+    for i in range(start_idx, n):
         name = experiment_name + f'_{i + 1}.pickle'
         
         path = Path(TRAIN_DATASET_PATH, name)
@@ -305,7 +321,6 @@ def main():
         print(x_test.shape)
         print(y_test.shape)
         test_data = [x_test.detach().numpy(), y_test.detach().numpy()]
-
         """
         training_data[0], training_data[1] = torch.FloatTensor(training_data[0]), torch.FloatTensor(training_data[1])
         test_data[0], test_data[1] = torch.FloatTensor(test_data[0]), torch.FloatTensor(test_data[1])

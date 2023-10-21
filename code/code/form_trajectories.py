@@ -113,7 +113,6 @@ def vel_cut(vel_components):
 
 
 def form_trajectory(vel_components, name):
-    train = vel2coord(vel_components)
     X_train = np.hstack((vel2coord(vel_components), vel_cut(vel_components)))
     y_train = vel2acc(vel_components)
     with open(Path("code/trajectories", name), 'wb') as handle:
